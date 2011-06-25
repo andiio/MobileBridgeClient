@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:View xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		xmlns:s="library://ns.adobe.com/flex/spark"
+		title="HTML"
+		creationComplete="onCreationComplete();"
+		viewActivate="onViewActivate();">
+	<fx:Script>
+		<![CDATA[
+			import mx.binding.utils.ChangeWatcher;
+			import mx.events.PropertyChangeEvent;
+			
+			private var webView:StageWebView;
+			
+			private function onCreationComplete():void
+			{
+				this.webView = new StageWebView();
+				//this.webView.addEventListener(ErrorEvent.ERROR, onError);
+				//this.webView.addEventListener(Event.COMPLETE, onComplete);
+				this.webView.stage = this.stage;
+				this.webView.viewPort = new Rectangle(0, 0, this.stage.stageWidth, this.stage.stageHeight);
+			}
+			
+			private function onViewActivate():void
+			{
+				if (this.data) this.webView.loadURL(this.data as String);				
+			}
+			
+			public function loadUrl(url:String):void
+			{
+				if (this.data) this.webView.loadURL(url);				
+			}
+			
+			public function getScreenshot():BitmapData
+			{
+				var bd:BitmapData = new BitmapData(this.webView.viewPort.width, this.webView.viewPort.height);
+				this.webView.drawViewPortToBitmapData(bd);
+				return bd;
+			}
+		]]>
+	</fx:Script>
+</s:View>

@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ViewNavigatorApplication xmlns:fx="http://ns.adobe.com/mxml/2009" 
+							xmlns:s="library://ns.adobe.com/flex/spark"
+							firstView="views.MobileBridgeClientHomeView"
+							applicationDPI="160">
+
+	<fx:Script>
+		<![CDATA[
+			import mx.graphics.codec.JPEGEncoder;
+			import mx.utils.Base64Encoder;
+			
+			import spark.components.View;
+			
+			import views.MobileBridgeClientHTMLView;
+			
+			private var netConnection:NetConnection;
+			private var netGroup:NetGroup;
+			private var deviceName:String;
+			
+			public function setupNetConnection(deviceName:String):void
+			{
+				this.deviceName = deviceName;
+				this.netConnection = new NetConnection();
+				this.netConnection.addEventListener(NetStatusEvent.NET_STATUS, onNetStatus);
+				this.netConnection.connect("rtmfp:");
+			}
+			
+			private function onNetStatus(e:NetStatusEvent):void
+			{
+				switch(e.info.code)
+				{
+					case "NetConnection.Connect.Success":
+						this.setUpGroup();
+						break;
+					case "NetGroup.Connect.Success":
+						// NetGroup successfully set up.
+						break;
+					case "NetGroup.Neighbor.Connect":
+						this.sendNameAndId();
+						break;
+					case "NetGroup.Posting.Notify":
+						var message:Object = e.info.message;
+						if (!message.to || message.to != this.netConnection.nearID) return;
+						if (message.type == "launch")
+						{
+							if ((this.navigator.activeView is MobileBridgeClientHTMLView))
+							{
+								(this.navigator.activeView as MobileBridgeClientHTMLView).loadUrl(message.url);
+							}
+							else
+							{
+								this.navigator.pushView(views.MobileBridgeClientHTMLView, message.url);
+							}
+						}
+						else if (message.type == "screenshot-request")
+						{
+							if (!(this.navigator.activeView is MobileBridgeClientHTMLView)) return;
+							var bd:BitmapData = (this.navigator.activeView as MobileBridgeClientHTMLView).getScreenshot();
+							this.sendScreenshot(bd);
+						}
+						break;
+				}
+			}
+			
+			private function setUpGroup():void
+			{
+				var groupspec:GroupSpecifier = new GroupSpecifier("MobileBridge");
+				groupspec.postingEnabled = true;
+				groupspec.ipMulticastMemberUpdatesEnabled = true;
+				groupspec.addIPMulticastAddress("225.225.0.1:30000");
+				this.netGroup = new NetGroup(this.netConnection, groupspec.groupspecWithAuthorizations());
+				this.netGroup.addEventListener(NetStatusEvent.NET_STATUS, onNetStatus);
+			}
+			
+			private function sendNameAndId():void
+			{
+				var msg:Object = new Object();
+				msg.type = "init";
+				msg.deviceName = this.deviceName;
+				msg.peerId = this.netConnection.nearID;
+				this.sendNetworkMessage(msg);
+			}
+			
+			private function sendScreenshot(bd:BitmapData):void
+			{
+
+				var jpegEncoder:JPEGEncoder = new JPEGEncoder(80);
+				var bytes:ByteArray = jpegEncoder.encode(bd);
+				var base64encoder:Base64Encoder = new Base64Encoder();
+				base64encoder.encodeBytes(bytes);
+				var base64:String = base64encoder.drain();
+				this.sendNetworkMessage({type:"screenshot-response", data:base64});
+			}
+			
+			private function sendNetworkMessage(message:Object):void
+			{
+				if (this.netConnection != null && this.netConnection.connected && this.netGroup != null && this.netGroup.neighborCount > 0)
+				{
+					message.time = new Date().time;
+					this.netGroup.post(message);
+				}
+			}
+
+		]]>
+	</fx:Script>
+</s:ViewNavigatorApplication>
